@@ -5,6 +5,8 @@ import javax.microedition.lcdui.CommandListener;
 import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.Displayable;
 import javax.microedition.lcdui.Command;
+import javax.microedition.lcdui.Alert;
+import javax.microedition.lcdui.AlertType;
 
 public class Editor {
 
@@ -69,6 +71,12 @@ public class Editor {
                 "Total time: 1 second\r\n" + //
                 "PS C:\\Users\\Aziz\\Documents\\NetBeansProjects\\BBIDE>");
         canvas.repaint();
+    }
+
+    private void showAlert(String title, String msg, Displayable next, int timeout) {
+        Alert a = new Alert(title, msg, null, AlertType.WARNING);
+        a.setTimeout(timeout);
+        midlet.getDisplay().setCurrent(a, next);
     }
 
     private class IDECanvas extends Canvas implements CommandListener {
@@ -168,19 +176,19 @@ public class Editor {
         }
 
         public void keyPressed(int keyCode) {
-            if (keyCode == -1) { // Up
+            if (keyCode == -1 || keyCode == 1) { // Up
                 cursorY--;
                 if (cursorY < 0) {
                     cursorY = charH - 1;
                 }
                 cursorX = clamp(cursorX, 0, getLastCharX(cursorY) + 1);
-            } else if (keyCode == -2) { // Down
+            } else if (keyCode == -2 || keyCode == 6) { // Down
                 cursorY++;
                 if (cursorY == charH) {
                     cursorY = 0;
                 }
                 cursorX = clamp(cursorX, 0, getLastCharX(cursorY) + 1);
-            } else if (keyCode == -3) { // Left
+            } else if (keyCode == -3 || keyCode == 2) { // Left
                 cursorX--;
                 if (cursorX < 0) {
                     cursorY--;
@@ -189,7 +197,7 @@ public class Editor {
                     }
                     cursorX = getLastCharX(cursorY) + 1;
                 }
-            } else if (keyCode == -4) { // Right
+            } else if (keyCode == -4 || keyCode == 5) { // Right
                 cursorX++;
                 if (cursorX >= getLastCharX(cursorY) + 1) {
                     cursorY++;
@@ -200,6 +208,8 @@ public class Editor {
                 }
             } else if (keyCode == -5) { // Select
                 print("\n");
+            } else if (keyCode < 0) { // unsupported special keys
+                showAlert("Unknown key", getKeyName(keyCode) + " (" + String.valueOf(keyCode) + ")", canvas, 1000);
             } else
                 print(String.valueOf((char) keyCode));
             repaint();

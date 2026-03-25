@@ -5,7 +5,7 @@ import javax.microedition.lcdui.*;
 
 public class IDEMidlet extends MIDlet {
     private Display   display;
-    private Editor editor;
+    public Editor editor;
 
     public void startApp() {
         display = Display.getDisplay(this);
@@ -13,16 +13,14 @@ public class IDEMidlet extends MIDlet {
         display.setCurrent(editor.getCanvas());
     }
 
-    public void pauseApp() {
-
-    }
+    public void pauseApp() {}
 
     public void destroyApp(boolean unconditional) {
-        
+        notifyDestroyed();
     }
 
     public void quit() {
-        
+        notifyDestroyed();
     }
 
     public Display getDisplay() {
