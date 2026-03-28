@@ -100,11 +100,13 @@ public class Editor implements CommandListener {
             if (!fc.exists()) {
                 fc.create();
             }
+            fc.truncate(0);
             OutputStream out = fc.openOutputStream();
             out.write(canvas.getText().getBytes());
             out.close();
             fc.close();
             showAlert("", "Saved " + filename + " successfully.", canvas, 2000);
+            currentFile = filename;
         } catch (IOException e) {
             showAlert("Error", e.getMessage(), canvas, 2000);
         }
