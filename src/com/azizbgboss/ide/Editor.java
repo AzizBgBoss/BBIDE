@@ -78,6 +78,9 @@ public class Editor implements CommandListener {
     public void saveFile(String filename) {
         try {
             FileConnection fc = (FileConnection) Connector.open(currentDir + filename);
+            if (!fc.exists()) {
+                fc.create();
+            }
             OutputStream out = fc.openOutputStream();
             out.write(canvas.getText().getBytes());
             out.close();
@@ -99,7 +102,6 @@ public class Editor implements CommandListener {
                 canvas.print(new String(buffer, 0, bytesRead));
             }
             in.close();
-            currentFileSize = fc.fileSize();
             fc.close();
             showAlert("", "Opened " + filename + " successfully.", canvas, 2000);
             currentFile = filename;
@@ -113,7 +115,6 @@ public class Editor implements CommandListener {
         if (d == canvas) {
             if (c == cmdNew) {
                 currentFile = null;
-                currentFileSize = 0;
                 canvas.clear();
             } else if (c == cmdOpen) {
                 exploreFile(OPEN_FILE);
@@ -213,6 +214,7 @@ public class Editor implements CommandListener {
         }
 
         public void clear() {
+            currentFileSize = 0;
             for (int y = 0; y < charH; y++) {
                 for (int x = 0; x < charW; x++) {
                     charArray[y][x] = 0;
@@ -235,6 +237,7 @@ public class Editor implements CommandListener {
                 }
                 text += "\n";
             }
+            text = text.substring(0, (int) currentFileSize);
             return text;
         }
 
@@ -251,46 +254,45 @@ public class Editor implements CommandListener {
             for (int i = 0; i < text.length(); i++) {
                 char c = text.charAt(i);
                 if (c == '\n') { // new line
-                    cursorX = 0;
-                    cursorY++;
-                    if (cursorY == charH) {
-                        cursorY = 0;
-                    }
-                } else if (c == '\r') { // carriage return (for windows, no need to implement)
-                } else if (c == '\b') { // backspace
-                    boolean sync = false;
-                    if (getCursor() == currentFileSize) {
-                        sync = true;
-                    }
-                    cursorX--;
-                    if (cursorX < 0) {
-                        cursorY--;
-                        if (cursorY < 0) {
-                            cursorY = 0;
-                        }
-                        cursorX = getLastCharX(cursorY) + 1;
-                    }
-                    charArray[cursorY][cursorX] = (char) 0;
-                    if (sync) {
-                        currentFileSize = getCursor();
-                    }
-                } else {
-                    charArray[cursorY][cursorX] = c;
-                    charColorArray[cursorY][cursorX] = color;
-                    cursorX++;
-                    if (cursorX == charW) {
+                    if (cursorY < charH) {
                         cursorX = 0;
                         cursorY++;
                         if (cursorY == charH) {
                             cursorY = 0;
                         }
+                        currentFileSize++;
                     }
-                    if (c == ' ') {
-                        color = (color + 0x0000FF) & 0xFFFFFF;
+                } else if (c == '\r') { // carriage return (for windows, no need to implement)
+                } else if (c == '\b') { // backspace
+                    if (getCursor() > 0) {
+                        cursorX--;
+                        if (cursorX < 0) {
+                            cursorY--;
+                            if (cursorY < 0) {
+                                cursorY = 0;
+                            }
+                            cursorX = getLastCharX(cursorY) + 1;
+                        }
+                        charArray[cursorY][cursorX] = (char) 0;
+                        currentFileSize--;
                     }
-                }
-                if (getCursor() > currentFileSize) {
-                    currentFileSize = getCursor();
+                } else {
+                    if (getCursor() < charW * charH) {
+                        charArray[cursorY][cursorX] = c;
+                        charColorArray[cursorY][cursorX] = color;
+                        cursorX++;
+                        if (cursorX == charW) {
+                            cursorX = 0;
+                            cursorY++;
+                            if (cursorY == charH) {
+                                cursorY = 0;
+                            }
+                        }
+                        if (c == ' ') {
+                            color = (color + 0x0000FF) & 0xFFFFFF;
+                        }
+                        currentFileSize++;
+                    }
                 }
             }
         }
@@ -303,7 +305,7 @@ public class Editor implements CommandListener {
             g.setColor(BACKGROUND_COLOR);
             g.fillRect(0, 0, screenW, screenH);
             for (int y = 0; y < charH; y++) {
-                if (y <= Math.ceil(currentFileSize / charW))
+                if (y <= getText().split("\n").length) // count how many lines (\n)
                     g.setColor(0x5A5A5A);
                 else
                     g.setColor(0x3A3A3C);
@@ -357,16 +359,15 @@ public class Editor implements CommandListener {
                     }
                 }
             } else if (keyCode == -4 || keyCode == 5) { // Right
-                cursorX++;
-                if (cursorX >= getLastCharX(cursorY) + 1) {
-                    cursorY++;
-                    if (cursorY == charH) {
-                        cursorY = 0;
+                if (getCursor() < currentFileSize) {
+                    cursorX++;
+                    if (cursorX >= getLastCharX(cursorY) + 1) {
+                        cursorY++;
+                        if (cursorY == charH) {
+                            cursorY = 0;
+                        }
+                        cursorX = 0;
                     }
-                    cursorX = 0;
-                }
-                if (getCursor() > currentFileSize) {
-                    setCursor(currentFileSize);
                 }
             } else if (keyCode == -5) { // Select
                 print("\n");
