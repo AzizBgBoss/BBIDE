@@ -10,8 +10,9 @@ import javax.microedition.lcdui.AlertType;
 import javax.microedition.io.file.FileConnection;
 import javax.microedition.io.Connector;
 import javax.microedition.lcdui.List;
+import javax.microedition.lcdui.TextBox;
+import javax.microedition.lcdui.TextField;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -21,9 +22,14 @@ public class Editor implements CommandListener {
 
     public static final int OPEN_FILE = 0;
     public static final int SAVE_FILE = 1;
+    public static final int NEW_FILE = 2;
+    public static final int NEW_FOLDER = 3;
+
+    public static final String defaultDir = "file:///";
 
     public int fileMode = 0;
-    public String currentDir = "file:///";
+    public int nameMode = 0;
+    public String currentDir = defaultDir;
     public String currentFile = null;
     public long currentFileSize = 0;
 
@@ -39,6 +45,12 @@ public class Editor implements CommandListener {
     private List fileExplorer;
     private Command cmdFXSelect;
     private Command cmdFXBack;
+    private Command cmdFXNewFolder;
+    private Command cmdFXNewFile;
+
+    private TextBox tbName;
+    private Command cmdTBOK;
+    private Command cmdTBCancel;
 
     public Canvas getCanvas() {
         return canvas;
@@ -150,6 +162,46 @@ public class Editor implements CommandListener {
                 }
             } else if (c == cmdFXBack) {
                 midlet.getDisplay().setCurrent(canvas);
+            } else if (c == cmdFXNewFolder) {
+                newElement(NEW_FOLDER);
+            } else if (c == cmdFXNewFile) {
+                newElement(NEW_FILE);
+            }
+        } else if (d == tbName) {
+            if (c == cmdTBOK) {
+                String filename = tbName.getString();
+                // check for illegal characters
+                char[] illegalChars = { '\\', '/', ':', '*', '?', '"', '<', '>', '|', '\n' };
+                for (int i = 0; i < illegalChars.length; i++) {
+                    if (filename.contains(illegalChars[i] + "")) {
+                        showAlert("Illegal Character", "Illegal character '" + illegalChars[i] + "' found in filename",
+                                fileExplorer, 2000);
+                        return;
+                    }
+                }
+                if (filename.length() == 0) {
+                    showAlert("Error", "Filename cannot be empty", fileExplorer, 2000);
+                    return;
+                }
+                try {
+                    FileConnection fc = (FileConnection) Connector.open(currentDir + filename);
+                    if (fc.exists()) {
+                        showAlert("Error", (nameMode == NEW_FOLDER ? "Folder " : "File ") + filename + " already exists",
+                                fileExplorer, 2000);
+                        fc.close();
+                        return;
+                    }
+                    if (nameMode == NEW_FOLDER)
+                        fc.mkdir();
+                    else
+                        fc.create();
+                    fc.close();
+                    exploreFile(fileMode);
+                } catch (IOException e) {
+                    showAlert("Error", e.getMessage(), canvas, 2000);
+                }
+            } else if (c == cmdTBCancel) {
+                midlet.getDisplay().setCurrent(fileExplorer);
             }
         }
     }
@@ -160,7 +212,7 @@ public class Editor implements CommandListener {
             FileConnection fc = (FileConnection) Connector.open(currentDir);
             Enumeration files = fc.list();
             fileExplorer = new List("File Explorer", List.IMPLICIT);
-            if (!currentDir.equals("file:///"))
+            if (!currentDir.equals(defaultDir))
                 fileExplorer.append("..", null);
             while (files.hasMoreElements()) {
                 String filename = (String) files.nextElement();
@@ -170,15 +222,37 @@ public class Editor implements CommandListener {
 
             cmdFXSelect = new Command("Select", Command.OK, 1);
             cmdFXBack = new Command("Close", Command.BACK, 2);
+            cmdFXNewFolder = new Command("New Folder", Command.SCREEN, 3);
+            cmdFXNewFile = new Command("New File", Command.SCREEN, 4);
 
             fileExplorer.addCommand(cmdFXSelect);
             fileExplorer.addCommand(cmdFXBack);
+            fileExplorer.addCommand(cmdFXNewFolder);
+            fileExplorer.addCommand(cmdFXNewFile);
             fileExplorer.setSelectCommand(cmdFXSelect);
             fileExplorer.setCommandListener(this);
             midlet.getDisplay().setCurrent(fileExplorer);
         } catch (Exception e) {
-            showAlert("Error", e.getMessage(), null, 1000);
+            if (currentDir.equals(defaultDir)) {
+                showAlert("Error", e.getMessage() + "\nTrying with SDCard/", canvas, 1000);
+                currentDir = "file:///SDCard/";
+                exploreFile(fileMode);
+            } else
+                showAlert("Error", e.getMessage(), canvas, 1000);
         }
+    }
+
+    private void newElement(int type) {
+        nameMode = type;
+        tbName = new TextBox("New " + (type == NEW_FOLDER ? "Folder" : "File"), "", 20, TextField.ANY);
+
+        cmdTBOK = new Command("OK", Command.OK, 1);
+        cmdTBCancel = new Command("Cancel", Command.CANCEL, 2);
+
+        tbName.addCommand(cmdTBOK);
+        tbName.addCommand(cmdTBCancel);
+        tbName.setCommandListener(this);
+        midlet.getDisplay().setCurrent(tbName);
     }
 
     private class IDECanvas extends Canvas {
