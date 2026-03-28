@@ -444,6 +444,14 @@ public class Editor implements CommandListener {
                         } else if (c == '>') {
                             charColorArray[renderY][renderX] = renderColor;
                             renderColor = 0xFFFFFF;
+                        } else if (c == '"' || c == '\'') {
+                            if (renderColor == 0x0000FF) {
+                                renderColor = 0xFFFF00;
+                                charColorArray[renderY][renderX] = renderColor;
+                            } else if (renderColor == 0xFFFF00) {
+                                charColorArray[renderY][renderX] = renderColor;
+                                renderColor = 0x0000FF;
+                            }
                         } else {
                             charColorArray[renderY][renderX] = renderColor;
                         }
