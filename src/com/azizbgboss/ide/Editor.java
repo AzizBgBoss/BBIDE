@@ -41,6 +41,7 @@ public class Editor implements CommandListener {
     private Command cmdSave;
     private Command cmdSaveAs;
     private Command cmdExit;
+    private Command cmdInsert;
 
     private List fileExplorer;
     private Command cmdFXSelect;
@@ -51,6 +52,10 @@ public class Editor implements CommandListener {
     private TextBox tbName;
     private Command cmdTBOK;
     private Command cmdTBCancel;
+
+    private TextBox tbInsert;
+    private Command cmdTBInsertOK;
+    private Command cmdTBInsertCancel;
 
     public Canvas getCanvas() {
         return canvas;
@@ -69,12 +74,14 @@ public class Editor implements CommandListener {
         cmdSave = new Command("Save", Command.SCREEN, 3);
         cmdSaveAs = new Command("Save As", Command.SCREEN, 4);
         cmdExit = new Command("Exit", Command.EXIT, 5);
+        cmdInsert = new Command("Insert", Command.SCREEN, 6);
 
         canvas.addCommand(cmdNew);
         canvas.addCommand(cmdOpen);
         canvas.addCommand(cmdSave);
         canvas.addCommand(cmdSaveAs);
         canvas.addCommand(cmdExit);
+        canvas.addCommand(cmdInsert);
         canvas.setCommandListener(this);
 
         canvas.print("Hello World!");
@@ -140,6 +147,24 @@ public class Editor implements CommandListener {
                 exploreFile(SAVE_FILE);
             } else if (c == cmdExit) {
                 midlet.quit();
+            } else if (c == cmdInsert) {
+                tbInsert = new TextBox("Insert", "", 256, TextField.ANY);
+
+                cmdTBInsertOK = new Command("OK", Command.OK, 1);
+                cmdTBInsertCancel = new Command("Cancel", Command.CANCEL, 2);
+
+                tbInsert.addCommand(cmdTBInsertOK);
+                tbInsert.addCommand(cmdTBInsertCancel);
+                tbInsert.setCommandListener(this);
+                midlet.getDisplay().setCurrent(tbInsert);
+            }
+        } else if (d == tbInsert) {
+            if (c == cmdTBInsertOK) {
+                canvas.print(tbInsert.getString());
+                canvas.repaint();
+                midlet.getDisplay().setCurrent(canvas);
+            } else if (c == cmdTBInsertCancel) {
+                midlet.getDisplay().setCurrent(canvas);
             }
         } else if (d == fileExplorer) {
             if (c == cmdFXSelect) {
@@ -186,7 +211,8 @@ public class Editor implements CommandListener {
                 try {
                     FileConnection fc = (FileConnection) Connector.open(currentDir + filename);
                     if (fc.exists()) {
-                        showAlert("Error", (nameMode == NEW_FOLDER ? "Folder " : "File ") + filename + " already exists",
+                        showAlert("Error",
+                                (nameMode == NEW_FOLDER ? "Folder " : "File ") + filename + " already exists",
                                 fileExplorer, 2000);
                         fc.close();
                         return;
@@ -407,7 +433,25 @@ public class Editor implements CommandListener {
                 }
 
                 charArray[renderY][renderX] = c;
-                charColorArray[renderY][renderX] = renderColor;
+
+                if (currentFile != null) {
+                    if (currentFile.endsWith(".html") || currentFile.endsWith(".htm") || currentFile.endsWith(".xml")) {
+                        if (c == '<') {
+                            renderColor = 0x0000FF;
+                            charColorArray[renderY][renderX] = renderColor;
+                        } else if (c == '>') {
+                            charColorArray[renderY][renderX] = renderColor;
+                            renderColor = 0xFFFFFF;
+                        } else {
+                            charColorArray[renderY][renderX] = renderColor;
+                        }
+                    } else {
+                        charColorArray[renderY][renderX] = renderColor;
+                    }
+                } else {
+                    charColorArray[renderY][renderX] = renderColor;
+                }
+
                 renderX++;
                 if (renderX > rowLengths[renderY]) {
                     rowLengths[renderY] = renderX;
@@ -418,6 +462,7 @@ public class Editor implements CommandListener {
                 cursorX = renderX;
                 cursorY = renderY;
             }
+
         }
 
         private void moveCursorVertical(int delta) {
