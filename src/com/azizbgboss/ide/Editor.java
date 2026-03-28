@@ -99,10 +99,11 @@ public class Editor implements CommandListener {
                 canvas.print(new String(buffer, 0, bytesRead));
             }
             in.close();
+            currentFileSize = fc.fileSize();
             fc.close();
             showAlert("", "Opened " + filename + " successfully.", canvas, 2000);
             currentFile = filename;
-            currentFileSize = fc.fileSize();
+            canvas.setCursor(0);
         } catch (IOException e) {
             showAlert("Error", e.getMessage(), canvas, 2000);
         }
@@ -112,6 +113,7 @@ public class Editor implements CommandListener {
         if (d == canvas) {
             if (c == cmdNew) {
                 currentFile = null;
+                currentFileSize = 0;
                 canvas.clear();
             } else if (c == cmdOpen) {
                 exploreFile(OPEN_FILE);
@@ -256,8 +258,9 @@ public class Editor implements CommandListener {
                     }
                 } else if (c == '\r') { // carriage return (for windows, no need to implement)
                 } else if (c == '\b') { // backspace
+                    boolean sync = false;
                     if (getCursor() == currentFileSize) {
-                        currentFileSize--;
+                        sync = true;
                     }
                     cursorX--;
                     if (cursorX < 0) {
@@ -268,6 +271,9 @@ public class Editor implements CommandListener {
                         cursorX = getLastCharX(cursorY) + 1;
                     }
                     charArray[cursorY][cursorX] = (char) 0;
+                    if (sync) {
+                        currentFileSize = getCursor();
+                    }
                 } else {
                     charArray[cursorY][cursorX] = c;
                     charColorArray[cursorY][cursorX] = color;
@@ -297,8 +303,8 @@ public class Editor implements CommandListener {
             g.setColor(BACKGROUND_COLOR);
             g.fillRect(0, 0, screenW, screenH);
             for (int y = 0; y < charH; y++) {
-                if (y < Math.ceil(currentFileSize / charW))
-                    g.setColor(0x4A4A4A);
+                if (y <= Math.ceil(currentFileSize / charW))
+                    g.setColor(0x5A5A5A);
                 else
                     g.setColor(0x3A3A3C);
                 TinyFont.drawString(g, String.valueOf(y + 1), 0, y * cellH);
