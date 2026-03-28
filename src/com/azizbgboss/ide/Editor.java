@@ -373,7 +373,7 @@ public class Editor implements CommandListener {
 
             int renderX = 0;
             int renderY = 0;
-            int renderColor = 0;
+            int renderColor = 0xFFFFFF;
             boolean cursorPlaced = false;
 
             for (int i = 0; i < textBuffer.length(); i++) {
@@ -411,9 +411,6 @@ public class Editor implements CommandListener {
                 renderX++;
                 if (renderX > rowLengths[renderY]) {
                     rowLengths[renderY] = renderX;
-                }
-                if (c == ' ') {
-                    renderColor = (renderColor + 0x0000FF) & 0xFFFFFF;
                 }
             }
 
