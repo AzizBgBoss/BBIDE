@@ -196,26 +196,49 @@ public class Editor implements CommandListener {
         // Define the array of characters in the IDE
         private char[][] charArray = new char[charH][charW];
         private int[][] charColorArray = new int[charH][charW];
+        private int[] rowStartOffsets = new int[charH];
+        private int[] rowLengths = new int[charH];
+        private String textBuffer = "";
         private int cursorX = 0;
         private int cursorY = 0;
-        private int color = 0;
+        private int cursorOffset = 0;
+        private int usedRowCount = 1;
 
         public int getCursor() {
-            return cursorY * charW + cursorX;
+            return cursorOffset;
         }
 
         public void moveCursor(int x, int y) { // increments the cursor position by x and y
-
+            if (y != 0) {
+                moveCursorVertical(y);
+            }
+            if (x != 0) {
+                setCursor(cursorOffset + x);
+            }
         }
 
         public void setCursor(long pos) {
-            cursorX = (int) (pos % charW);
-            cursorY = (int) (pos / charW);
+            cursorOffset = clamp((int) pos, 0, (int) currentFileSize);
+            rebuildScreen();
         }
 
         public void clear() {
-            currentFileSize = 0;
+            replaceText("", 0);
+            repaint();
+        }
+
+        public String getText() {
+            return textBuffer;
+        }
+
+        private int getRowLength(int y) {
+            return rowLengths[y];
+        }
+
+        private void resetScreen() {
             for (int y = 0; y < charH; y++) {
+                rowStartOffsets[y] = 0;
+                rowLengths[y] = 0;
                 for (int x = 0; x < charW; x++) {
                     charArray[y][x] = 0;
                     charColorArray[y][x] = 0;
@@ -223,89 +246,151 @@ public class Editor implements CommandListener {
             }
             cursorX = 0;
             cursorY = 0;
-            color = 0;
-            repaint();
+            usedRowCount = 1;
         }
 
-        public String getText() {
-            String text = "";
-            for (int y = 0; y < charH; y++) {
-                for (int x = 0; x < charW; x++) {
-                    if (charArray[y][x] != 0) {
-                        text += charArray[y][x];
+        private String fitText(String text) {
+            StringBuffer fitted = new StringBuffer(text.length());
+            int x = 0;
+            int y = 0;
+
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+
+                if (c == '\r') {
+                    continue;
+                }
+
+                if (c == '\n') {
+                    if (y == charH - 1) {
+                        break;
                     }
+                    fitted.append(c);
+                    y++;
+                    x = 0;
+                    continue;
                 }
-                text += "\n";
+
+                if (x == charW) {
+                    if (y == charH - 1) {
+                        break;
+                    }
+                    y++;
+                    x = 0;
+                }
+
+                fitted.append(c);
+                x++;
             }
-            text = text.substring(0, (int) currentFileSize);
-            return text;
+
+            return fitted.toString();
         }
 
-        public int getLastCharX(int y) {
-            for (int x = charW - 1; x >= 0; x--) {
-                if (charArray[y][x] != 0) {
-                    return x;
+        private void replaceText(String text, int newCursorOffset) {
+            textBuffer = fitText(text);
+            currentFileSize = textBuffer.length();
+            cursorOffset = clamp(newCursorOffset, 0, (int) currentFileSize);
+            rebuildScreen();
+        }
+
+        private void rebuildScreen() {
+            resetScreen();
+            rowStartOffsets[0] = 0;
+
+            int renderX = 0;
+            int renderY = 0;
+            int renderColor = 0;
+            boolean cursorPlaced = false;
+
+            for (int i = 0; i < textBuffer.length(); i++) {
+                char c = textBuffer.charAt(i);
+
+                if (c != '\n' && renderX == charW) {
+                    if (renderY == charH - 1) {
+                        break;
+                    }
+                    renderY++;
+                    renderX = 0;
+                    rowStartOffsets[renderY] = i;
+                    usedRowCount = renderY + 1;
+                }
+
+                if (i == cursorOffset) {
+                    cursorX = renderX;
+                    cursorY = renderY;
+                    cursorPlaced = true;
+                }
+
+                if (c == '\n') {
+                    if (renderY == charH - 1) {
+                        break;
+                    }
+                    renderY++;
+                    renderX = 0;
+                    rowStartOffsets[renderY] = i + 1;
+                    usedRowCount = renderY + 1;
+                    continue;
+                }
+
+                charArray[renderY][renderX] = c;
+                charColorArray[renderY][renderX] = renderColor;
+                renderX++;
+                if (renderX > rowLengths[renderY]) {
+                    rowLengths[renderY] = renderX;
+                }
+                if (c == ' ') {
+                    renderColor = (renderColor + 0x0000FF) & 0xFFFFFF;
                 }
             }
-            return -1;
+
+            if (!cursorPlaced) {
+                cursorX = renderX;
+                cursorY = renderY;
+            }
+        }
+
+        private void moveCursorVertical(int delta) {
+            int targetRow = clamp(cursorY + delta, 0, usedRowCount - 1);
+            int targetColumn = clamp(cursorX, 0, getRowLength(targetRow));
+            cursorOffset = rowStartOffsets[targetRow] + targetColumn;
+            rebuildScreen();
         }
 
         public void print(String text) {
+            String updated = textBuffer;
+            int newCursorOffset = cursorOffset;
+
             for (int i = 0; i < text.length(); i++) {
                 char c = text.charAt(i);
-                if (c == '\n') { // new line
-                    if (cursorY < charH) {
-                        cursorX = 0;
-                        cursorY++;
-                        if (cursorY == charH) {
-                            cursorY = 0;
-                        }
-                        currentFileSize++;
-                    }
-                } else if (c == '\r') { // carriage return (for windows, no need to implement)
-                } else if (c == '\b') { // backspace
-                    if (getCursor() > 0) {
-                        cursorX--;
-                        if (cursorX < 0) {
-                            cursorY--;
-                            if (cursorY < 0) {
-                                cursorY = 0;
-                            }
-                            cursorX = getLastCharX(cursorY) + 1;
-                        }
-                        charArray[cursorY][cursorX] = (char) 0;
-                        currentFileSize--;
+
+                if (c == '\r') {
+                    continue;
+                }
+
+                if (c == '\b') {
+                    if (newCursorOffset > 0) {
+                        updated = updated.substring(0, newCursorOffset - 1) + updated.substring(newCursorOffset);
+                        newCursorOffset--;
                     }
                 } else {
-                    if (getCursor() < charW * charH) {
-                        charArray[cursorY][cursorX] = c;
-                        charColorArray[cursorY][cursorX] = color;
-                        cursorX++;
-                        if (cursorX == charW) {
-                            cursorX = 0;
-                            cursorY++;
-                            if (cursorY == charH) {
-                                cursorY = 0;
-                            }
-                        }
-                        if (c == ' ') {
-                            color = (color + 0x0000FF) & 0xFFFFFF;
-                        }
-                        currentFileSize++;
-                    }
+                    updated = updated.substring(0, newCursorOffset) + c + updated.substring(newCursorOffset);
+                    newCursorOffset++;
                 }
             }
+
+            replaceText(updated, newCursorOffset);
         }
 
         public IDECanvas() {
             setFullScreenMode(true);
+            rebuildScreen();
         }
 
         protected void paint(Graphics g) {
             g.setColor(BACKGROUND_COLOR);
             g.fillRect(0, 0, screenW, screenH);
             for (int y = 0; y < charH; y++) {
-                if (y <= getText().split("\n").length) // count how many lines (\n)
+                if (y < usedRowCount)
                     g.setColor(0x5A5A5A);
                 else
                     g.setColor(0x3A3A3C);
@@ -327,47 +412,16 @@ public class Editor implements CommandListener {
 
         public void keyPressed(int keyCode) {
             if (keyCode == -1 || keyCode == 1) { // Up
-                cursorY--;
-                if (cursorY < 0) {
-                    cursorY = 0;
-                }
-                cursorX = clamp(cursorX, 0, getLastCharX(cursorY) + 1);
-                if (getCursor() > currentFileSize) {
-                    setCursor(currentFileSize);
-                }
+                moveCursorVertical(-1);
             } else if (keyCode == -2 || keyCode == 6) { // Down
-                cursorY++;
-                if (cursorY == charH) {
-                    cursorY = 0;
-                }
-                cursorX = clamp(cursorX, 0, getLastCharX(cursorY) + 1);
-                if (getCursor() > currentFileSize) {
-                    setCursor(currentFileSize);
-                }
+                moveCursorVertical(1);
             } else if (keyCode == -3 || keyCode == 2) { // Left
-                if (getCursor() > 0) {
-                    cursorX--;
-                    if (cursorX < 0) {
-                        cursorY--;
-                        if (cursorY < 0) {
-                            cursorY = 0;
-                        }
-                        cursorX = getLastCharX(cursorY) + 1;
-                    }
-                    if (getCursor() > currentFileSize) {
-                        setCursor(currentFileSize);
-                    }
+                if (cursorOffset > 0) {
+                    setCursor(cursorOffset - 1);
                 }
             } else if (keyCode == -4 || keyCode == 5) { // Right
-                if (getCursor() < currentFileSize) {
-                    cursorX++;
-                    if (cursorX >= getLastCharX(cursorY) + 1) {
-                        cursorY++;
-                        if (cursorY == charH) {
-                            cursorY = 0;
-                        }
-                        cursorX = 0;
-                    }
+                if (cursorOffset < currentFileSize) {
+                    setCursor(cursorOffset + 1);
                 }
             } else if (keyCode == -5) { // Select
                 print("\n");
