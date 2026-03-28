@@ -173,7 +173,7 @@ public class Editor implements CommandListener {
                 // check for illegal characters
                 char[] illegalChars = { '\\', '/', ':', '*', '?', '"', '<', '>', '|', '\n' };
                 for (int i = 0; i < illegalChars.length; i++) {
-                    if (filename.contains(illegalChars[i] + "")) {
+                    if (filename.indexOf(illegalChars[i]) != -1) {
                         showAlert("Illegal Character", "Illegal character '" + illegalChars[i] + "' found in filename",
                                 fileExplorer, 2000);
                         return;
