@@ -106,7 +106,11 @@ public class Editor implements CommandListener {
             out.close();
             fc.close();
             showAlert("", "Saved " + filename + " successfully.", canvas, 2000);
-            currentFile = filename;
+            if (currentFile != filename) {
+                currentFile = filename;
+                canvas.rebuildScreen();
+                canvas.repaint();
+            }
         } catch (IOException e) {
             showAlert("Error", e.getMessage(), canvas, 2000);
         }
@@ -300,6 +304,7 @@ public class Editor implements CommandListener {
         private int[][] charColorArray = new int[charH][charW];
         private int[] rowStartOffsets = new int[charH];
         private int[] rowLengths = new int[charH];
+        private boolean[] isNewLine = new boolean[charH];
         private String textBuffer = "";
         private int cursorX = 0;
         private int cursorY = 0;
@@ -341,6 +346,7 @@ public class Editor implements CommandListener {
             for (int y = 0; y < charH; y++) {
                 rowStartOffsets[y] = 0;
                 rowLengths[y] = 0;
+                isNewLine[y] = false;
                 for (int x = 0; x < charW; x++) {
                     charArray[y][x] = 0;
                     charColorArray[y][x] = 0;
@@ -398,6 +404,7 @@ public class Editor implements CommandListener {
         private void rebuildScreen() {
             resetScreen();
             rowStartOffsets[0] = 0;
+            isNewLine[0] = true;
 
             int renderX = 0;
             int renderY = 0;
@@ -430,6 +437,7 @@ public class Editor implements CommandListener {
                     renderY++;
                     renderX = 0;
                     rowStartOffsets[renderY] = i + 1;
+                    isNewLine[renderY] = true;
                     usedRowCount = renderY + 1;
                     continue;
                 }
@@ -438,10 +446,10 @@ public class Editor implements CommandListener {
 
                 if (currentFile != null) {
                     if (currentFile.endsWith(".html") || currentFile.endsWith(".htm") || currentFile.endsWith(".xml")) {
-                        if (c == '<') {
+                        if (c == '<' && renderColor != 0xFFFF00) {
                             renderColor = 0x0000FF;
                             charColorArray[renderY][renderX] = renderColor;
-                        } else if (c == '>') {
+                        } else if (c == '>' && renderColor != 0xFFFF00) {
                             charColorArray[renderY][renderX] = renderColor;
                             renderColor = 0xFFFFFF;
                         } else if (c == '"' || c == '\'') {
@@ -515,12 +523,17 @@ public class Editor implements CommandListener {
         protected void paint(Graphics g) {
             g.setColor(BACKGROUND_COLOR);
             g.fillRect(0, 0, screenW, screenH);
+            int line = 1;
             for (int y = 0; y < charH; y++) {
-                if (y < usedRowCount)
-                    g.setColor(0x5A5A5A);
-                else
+                if (y < usedRowCount) {
+                    if (isNewLine[y]) {
+                        g.setColor(0x5A5A5A);
+                        TinyFont.drawString(g, String.valueOf(line), 0, y * cellH);
+                        line++;
+                    }
+                } else {
                     g.setColor(0x3A3A3C);
-                TinyFont.drawString(g, String.valueOf(y + 1), 0, y * cellH);
+                }
                 g.drawLine(lineSpacing * cellW - cellW / 2 - 1, y * cellH, lineSpacing * cellW - cellW / 2 - 1,
                         y * cellH + cellH - 1);
             }
